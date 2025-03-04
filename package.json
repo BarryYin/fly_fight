@@ -1,0 +1,39 @@
+{
+  "name": "fly-game",
+  "version": "1.0.0",
+  "description": "无人机战斗模拟游戏",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "download-threejs": "node js/lib/download.js",
+    "multiplayer": "node server_multiplayer.js",
+    "deploy": "vercel --prod"
+  },
+  "dependencies": {
+    "express": "^4.17.1",
+    "compression": "^1.7.4",
+    "ws": "^8.13.0",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.15",
+    "vercel": "^30.2.2"
+  },
+  "engines": {
+    "node": ">=14.x"
+  },
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/fly_game.git"
+  },
+  "keywords": [
+    "game",
+    "threejs",
+    "drone",
+    "webgl",
+    "3d"
+  ]
+}
