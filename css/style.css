@@ -1,0 +1,435 @@
+body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background-color: #000;
+    font-family: Arial, sans-serif;
+}
+
+#canvas-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+#info {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    color: white;
+    background-color: rgba(0, 0, 0, 0.5);
+    padding: 10px;
+    border-radius: 5px;
+    z-index: 100;
+}
+
+#hud {
+    display: flex;
+    flex-direction: column;
+    margin-top: 10px;
+}
+
+.hud-item {
+    margin: 5px 0;
+}
+
+/* 添加战斗相关HUD样式 */
+#health {
+    color: #ff5555;
+    font-weight: bold;
+}
+
+#destroyed {
+    color: #ffaa00;
+    font-weight: bold;
+}
+
+/* 添加子弹准星 */
+#crosshair {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+    z-index: 1000;
+}
+
+body:has(canvas:active) #crosshair {
+    opacity: 1;
+}
+
+#crosshair::before, #crosshair::after {
+    content: '';
+    position: absolute;
+    background-color: rgba(255, 255, 0, 0.7);
+}
+
+#crosshair::before {
+    top: 9px;
+    left: 3px;
+    width: 14px;
+    height: 2px;
+}
+
+#crosshair::after {
+    top: 3px;
+    left: 9px;
+    width: 2px;
+    height: 14px;
+}
+
+/* 敌机指示器动画 */
+.enemy-indicator {
+    animation: pulse 1s infinite alternate;
+}
+
+@keyframes pulse {
+    0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0.5; }
+    100% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.9; }
+}
+
+h1 {
+    margin: 0;
+    padding: 0;
+    font-size: 18px;
+}
+
+#controls {
+    margin-top: 15px;
+    font-size: 12px;
+}
+
+/* 伤害数字样式 */
+.damage-number {
+    position: absolute;
+    color: #ff0000;
+    font-weight: bold;
+    font-size: 16px;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 999;
+    font-family: Arial, sans-serif;
+    animation: damage-float 1s forwards;
+}
+
+@keyframes damage-float {
+    0% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(0.5);
+    }
+    50% {
+        transform: translate(-50%, -50%) scale(1.2);
+    }
+    100% {
+        opacity: 0;
+        transform: translate(-50%, -100%) scale(1);
+    }
+}
+
+/* 添加生命条样式 */
+.health-bar {
+    position: absolute;
+    width: 100%;
+    height: 10px;
+    background-color: rgba(0, 0, 0, 0.5);
+    border-radius: 5px;
+    overflow: hidden;
+    bottom: 5px;
+    left: 0;
+}
+
+.health-fill {
+    height: 100%;
+    width: 100%;
+    background-color: #2ecc71;
+    transition: width 0.2s ease, background-color 0.2s ease;
+}
+
+.low-health .health-fill {
+    background-color: #e74c3c;
+}
+
+/* 击杀确认提示 */
+.kill-confirm {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #ffcc00;
+    font-size: 24px;
+    font-weight: bold;
+    text-shadow: 0 0 5px #ff0000, 0 0 10px #ff0000;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 1000;
+    animation: kill-confirm 1.5s ease-out forwards;
+}
+
+@keyframes kill-confirm {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+    30% { opacity: 1; transform: translate(-50%, -50%) scale(1.5); }
+    70% { opacity: 1; transform: translate(-50%, -50%) scale(1.5); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(2); }
+}
+
+/* 小地图样式 */
+.minimap-container {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 2px solid rgba(255, 255, 255, 0.5);
+    z-index: 1000;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+}
+
+.minimap-canvas {
+    width: 100%;
+    height: 100%;
+}
+
+/* 自定义小地图图标样式 */
+.map-icon {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.map-icon.player {
+    background-color: #00ff00;
+    width: 10px;
+    height: 10px;
+    z-index: 10;
+}
+
+.map-icon.enemy {
+    background-color: #ff0000;
+}
+
+/* 响应式设计 - 在小屏幕上缩小UI元素 */
+@media (max-width: 768px) {
+    #info {
+        font-size: 14px;
+    }
+    
+    .minimap-container {
+        width: 120px;
+        height: 120px;
+    }
+}
+
+/* 雷达样式 */
+.radar-container {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 2px solid rgba(0, 255, 0, 0.4);
+    z-index: 1000;
+    box-shadow: 0 0 10px rgba(0, 100, 0, 0.7);
+    background-color: rgba(0, 20, 0, 0.7);
+}
+
+.radar-canvas {
+    width: 100%;
+    height: 100%;
+}
+
+/* 雷达扫描动画 */
+@keyframes radar-scan {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* 雷达信号效果 */
+.radar-signal {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    background-color: rgba(255, 0, 0, 0.8);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 4px red;
+}
+
+/* 雷达界面上的数字和标记 */
+.radar-label {
+    position: absolute;
+    color: rgba(0, 255, 0, 0.8);
+    font-size: 10px;
+    font-family: monospace;
+    pointer-events: none;
+}
+
+/* 雷达控制面板样式 */
+.radar-control-panel {
+    position: absolute;
+    bottom: -40px;
+    left: 0;
+    width: 100%;
+    display: flex;
+    justify-content: space-around;
+    padding: 5px;
+    background-color: rgba(0, 30, 0, 0.7);
+    border-radius: 0 0 8px 8px;
+    transition: bottom 0.3s ease;
+}
+
+.radar-container:hover .radar-control-panel {
+    bottom: 0;
+}
+
+.radar-button {
+    background-color: rgba(0, 100, 0, 0.7);
+    color: #00ff00;
+    border: 1px solid #00ff00;
+    border-radius: 4px;
+    padding: 2px 5px;
+    font-size: 10px;
+    font-family: monospace;
+    cursor: pointer;
+    outline: none;
+    transition: all 0.2s;
+}
+
+.radar-button:hover {
+    background-color: rgba(0, 150, 0, 0.7);
+}
+
+/* 通知样式 */
+#notification {
+    position: fixed;
+    top: 100px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(0, 30, 0, 0.8);
+    color: #00ff00;
+    padding: 10px 15px;
+    border-radius: 5px;
+    border: 1px solid #00ff00;
+    font-family: monospace;
+    font-size: 16px;
+    z-index: 2000;
+    pointer-events: none;
+    box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+}    transition: width 0.5s ease, background-color 0.5s ease;    height: 100%;.player-health-fill {}    overflow: hidden;    border-radius: 2px;    background-color: rgba(0, 0, 0, 0.5);    height: 4px;.player-health-bar {}    margin-bottom: 3px;    display: block;.player-name {}    background-color: rgba(0, 80, 0, 0.7);.player-item.self {}    border-radius: 3px;    background-color: rgba(0, 40, 0, 0.5);    margin-bottom: 2px;    padding: 5px;.player-item {}    padding: 5px;    overflow-y: auto;    max-height: 250px;.player-list {}    cursor: pointer;    float: right;.toggle-button {}    user-select: none;    cursor: pointer;    border-bottom: 1px solid #00ff00;    background-color: rgba(0, 50, 0, 0.9);    padding: 8px;.player-list-header {}    overflow: hidden;    max-height: 300px;    width: 200px;    box-shadow: 0 0 8px rgba(0, 255, 0, 0.3);    border: 1px solid #00ff00;    z-index: 1000;    font-size: 14px;    font-family: monospace;    border-radius: 5px;    color: #00ff00;    background-color: rgba(0, 30, 0, 0.8);    right: 10px;    top: 50px;    position: fixed;.player-list-container {/* 玩家列表样式 */
+/* 在线人数显示样式 */
+.online-count-container {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    background-color: rgba(0, 30, 0, 0.7);
+    color: #00ff00;
+    padding: 8px 12px;
+    border-radius: 5px;
+    font-family: monospace;
+    font-size: 14px;
+    z-index: 1000;
+    border: 1px solid #00ff00;
+    box-shadow: 0 0 8px rgba(0, 255, 0, 0.3);
+    transition: all 0.3s ease;
+}
+
+.online-count {
+    display: flex;
+    align-items: center;
+}
+
+.online-count::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background-color: #00ff00;
+    border-radius: 50%;
+    margin-right: 8px;
+    box-shadow: 0 0 5px #00ff00;
+    animation: pulse-online 2s infinite;
+}
+
+@keyframes pulse-online {
+    0% { opacity: 0.5; }
+    50% { opacity: 1; }
+    100% { opacity: 0.5; }
+}

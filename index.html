@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>无人机战斗模拟</title>
+    <link rel="stylesheet" href="css/style.css">
+    
+    <!-- 直接引用本地Three.js库 -->
+    <script src="js/lib/three.min.js"></script>
+</head>
+<body>
+    <!-- 隐藏调试信息，但保留以备需要 -->
+    <div id="debug" style="position:absolute; bottom:10px; left:10px; color:white; background-color:rgba(0,0,0,0.5); padding:10px; border-radius:5px; z-index:100; display:none;"></div>
+    
+    <!-- 添加准星 -->
+    <div id="crosshair"></div>
+    
+    <div id="info">
+        <h1>无人机战斗模拟器</h1>
+        <div id="hud">
+            <div class="hud-item">生命值: <span id="health">100</span>%</div>
+            <div class="hud-item">高度: <span id="altitude">0</span>m</div>
+            <div class="hud-item">速度: <span id="speed">0</span>km/h</div>
+            <div class="hud-item">电量: <span id="battery">100</span>%</div>
+            <div class="hud-item">坐标: <span id="coordinates">0, 0, 0</span></div>
+            <div class="hud-item">敌机数量: <span id="enemy-count">0</span></div>
+            <div class="hud-item">击毁敌机: <span id="destroyed">0</span></div>
+        </div>
+        <div id="controls">
+            <p>控制: ↑/↓ - 前进/后退, ←/→ - 左右旋转, A/D - 左右移动, W/S - 上升/下降</p>
+            <p><strong>空格键</strong> - 发射武器, <strong>鼠标</strong> - 控制视角, <strong>V键</strong> - 切换视角模式</p>
+        </div>
+    </div>
+    
+    <div id="canvas-container"></div>
+    
+    <!-- 添加健康条 -->
+    <div id="health-bar" class="health-bar" style="position:fixed; bottom:20px; left:50%; transform:translateX(-50%); width:300px; height:20px; background:rgba(0,0,0,0.5); border-radius:10px; overflow:hidden; z-index:1000;">
+        <div class="health-fill" style="width:100%; height:100%; background:#2ecc71;"></div>
+    </div>
+    
+    <!-- 添加调试信息面板 -->
+    <div id="debug-panel" style="position:absolute; left:10px; bottom:10px; background-color:rgba(0,0,0,0.7); color:#00ff00; padding:10px; border-radius:5px; font-family:monospace; font-size:12px; z-index:1000;">
+      <div>连接状态: <span id="debug-connection">未连接</span></div>
+      <div>玩家ID: <span id="debug-player-id">未分配</span></div>
+      <div>在线玩家: <span id="debug-online-count">0</span></div>
+      <div>FPS: <span id="debug-fps">0</span></div>
+      <button onclick="toggleDebugInfo()">切换调试信息</button>
+    </div>
+
+    <!-- 连接状态显示 -->
+    <div id="connection-status" style="position:fixed; top:5px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.7); color:#ffff00; padding:5px 10px; border-radius:5px; z-index:10000; font-size:12px;">未连接</div>
+    
+    <!-- 按顺序加载脚本 -->
+    <script src="js/scene.js"></script>
+    <script src="js/audio.js"></script>
+    <script src="js/projectiles.js"></script>
+    <script src="js/enemy.js"></script>
+    <script src="js/drone.js"></script>
+    <script src="js/minimap.js"></script>
+    <script src="js/effects.js"></script> <!-- 新增效果脚本 -->
+    <script src="multiplayer.js"></script>
+    <script src="js/network-debug.js"></script>
+    <!-- 添加输入修复脚本 -->
+    <script src="js/input-fix.js"></script>
+    <script src="js/main.js"></script>
+    
+    <!-- 简单的初始化检查 -->
+    <script>
+        window.addEventListener('load', function() {
+            console.log('应用已加载，Three.js版本:', THREE.REVISION);
+            
+            // 如果出现问题，可以显示调试面板
+            document.addEventListener('keydown', function(event) {
+                if (event.ctrlKey && event.shiftKey && event.code === 'KeyD') {
+                    const debugEl = document.getElementById('debug');
+                    debugEl.style.display = debugEl.style.display === 'none' ? 'block' : 'none';
+                    if (debugEl.style.display === 'block') {
+                        debugEl.innerHTML = 'Three.js 版本: ' + THREE.REVISION + '<br>';
+                        debugEl.innerHTML += '按 Ctrl+Shift+D 隐藏调试面板';
+                    }
+                }
+            });
+
+            // 添加网络状态检测
+            setTimeout(function() {
+                // 如果2秒后仍未连接，提示用户手动检查
+                if (!multiplayerManager.connected) {
+                    console.warn('无法自动连接到多人游戏服务器，请检查服务器是否运行');
+                    showNotification('无法连接到多人游戏服务器，请确保服务器正在运行', 5000);
+                    
+                    const debugPanel = document.getElementById('debug-panel');
+                    if (debugPanel) {
+                        debugPanel.style.borderColor = '#ff0000';
+                        debugPanel.style.boxShadow = '0 0 10px #ff0000';
+                        
+                        // 添加服务器启动提示
+                        const hint = document.createElement('div');
+                        hint.innerHTML = `
+                            <div style="color:#ff0000; margin-top:10px;">
+                                <strong>提示:</strong> 服务器可能未启动！<br>
+                                请运行: <code>node server_multiplayer.js</code>
+                                <button onclick="NetworkDebug.showUI()" style="background:#333; color:#fff; border:none; padding:3px 8px; margin-left:5px; cursor:pointer;">诊断连接</button>
+                            </div>
+                        `;
+                        debugPanel.appendChild(hint);
+                    }
+                }
+            }, 4000);
+        });
+
+        function toggleDebugInfo() {
+            const playerList = document.getElementById('player-list');
+            if (playerList) {
+              playerList.style.display = playerList.style.display === 'none' ? 'block' : 'none';
+            }
+        }
+        
+        // 更新调试面板
+        function updateDebugInfo() {
+            if (!multiplayerManager) return;
+            
+            document.getElementById('debug-connection').textContent = 
+              multiplayerManager.connected ? '已连接' : '未连接';
+            document.getElementById('debug-connection').style.color = 
+              multiplayerManager.connected ? '#00ff00' : '#ff0000';
+            
+            document.getElementById('debug-player-id').textContent = 
+              multiplayerManager.playerId || '未分配';
+            
+            document.getElementById('debug-online-count').textContent = 
+              multiplayerManager.onlineCount || '0';
+        }
+        
+        // 定期更新调试信息
+        setInterval(updateDebugInfo, 1000);
+
+        // 添加键盘调试标志
+        let keyboardDebug = false;
+        document.addEventListener('keydown', function(e) {
+            // 按Ctrl+K开关键盘调试
+            if (e.ctrlKey && e.code === 'KeyK') {
+                keyboardDebug = !keyboardDebug;
+                showNotification('键盘调试: ' + (keyboardDebug ? '开启' : '关闭'));
+            }
+            
+            // 如果调试模式开启，显示按键
+            if (keyboardDebug) {
+                console.log('键盘按下:', e.code);
+            }
+            
+            // Ctrl+G 重新开始游戏
+            if (e.ctrlKey && e.code === 'KeyG') {
+                if (window.InputFix) {
+                    window.InputFix.restartGame();
+                }
+            }
+        });
+    </script>
+</body>
+</html>
