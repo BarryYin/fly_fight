@@ -71,11 +71,34 @@ wss.on('connection', (ws, req) => {
             }
             // 处理玩家伤害消息
             else if (data.type === 'playerDamage' && data.targetId) {
+                // 验证攻击目标不是自己
+                if (data.targetId === playerId) {
+                    console.log(`玩家 ${playerId} 试图攻击自己，已忽略`);
+                    return;
+                }
+                
                 console.log(`玩家 ${playerId} 对玩家 ${data.targetId} 造成伤害: ${data.damage}`);
                 
                 // 确保目标玩家存在
                 if (players.has(data.targetId)) {
                     const targetPlayer = players.get(data.targetId);
+                    const sourcePlayer = players.get(playerId);
+                    
+                    // 可选：检查攻击距离是否合理
+                    if (data.validateDistance !== false) {
+                        const dx = sourcePlayer.position.x - targetPlayer.position.x;
+                        const dy = sourcePlayer.position.y - targetPlayer.position.y;
+                        const dz = sourcePlayer.position.z - targetPlayer.position.z;
+                        const distance = Math.sqrt(dx*dx + dy*dy + dz*dz);
+                        const maxAttackDistance = 50; // 根据游戏设定调整
+                        
+                        if (distance > maxAttackDistance) {
+                            console.log(`玩家 ${playerId} 攻击距离过远(${distance.toFixed(2)}), 已忽略`);
+                            return;
+                        }
+                        
+                        console.log(`攻击有效: 距离=${distance.toFixed(2)}`);
+                    }
                     
                     // 更新目标玩家的健康值
                     const oldHealth = targetPlayer.health || 100;
@@ -90,16 +113,66 @@ wss.on('connection', (ws, req) => {
                             fromId: playerId,
                             damage: data.damage,
                             newHealth: targetPlayer.health,
-                            damageType: data.damageType || 'bullet'
+                            damageType: data.damageType || 'bullet',
+                            position: data.hitPosition // 增加击中位置数据
                         }));
                         
                         console.log(`已通知玩家 ${data.targetId} 受到来自 ${playerId} 的伤害`);
                     }
                     
-                    // 向其他所有玩家广播这个玩家的健康值更新
+                    // 向所有玩家广播这次攻击事件
+                    broadcastAttackEvent(playerId, data.targetId, {
+                        damage: data.damage,
+                        damageType: data.damageType || 'bullet',
+                        hitPosition: data.hitPosition,
+                        targetHealth: targetPlayer.health
+                    });
+                    
+                    // 向其他所有玩家广播被击中玩家的健康值更新
                     broadcastPlayerUpdate(data.targetId, {
                         health: targetPlayer.health
                     });
+                    
+                    // 检查玩家是否死亡
+                    if (targetPlayer.health <= 0) {
+                        console.log(`玩家 ${data.targetId} 被玩家 ${playerId} 击败`);
+                        
+                        // 广播玩家死亡事件
+                        broadcastGameEvent({
+                            type: 'playerDefeated',
+                            defeatedId: data.targetId,
+                            defeaterId: playerId,
+                            timestamp: Date.now()
+                        });
+                        
+                        // 可选：重置玩家健康值并重生
+                        setTimeout(() => {
+                            if (players.has(data.targetId)) {
+                                const respawnPlayer = players.get(data.targetId);
+                                respawnPlayer.health = 100;
+                                respawnPlayer.position = { 
+                                    x: Math.random() * 20 - 10,
+                                    y: 5,
+                                    z: Math.random() * 20 - 10
+                                };
+                                
+                                // 通知玩家重生
+                                if (respawnPlayer.ws.readyState === WebSocket.OPEN) {
+                                    respawnPlayer.ws.send(JSON.stringify({
+                                        type: 'respawn',
+                                        position: respawnPlayer.position,
+                                        health: 100
+                                    }));
+                                }
+                                
+                                // 广播玩家重生
+                                broadcastPlayerUpdate(data.targetId, {
+                                    health: 100,
+                                    position: respawnPlayer.position
+                                });
+                            }
+                        }, 3000); // 3秒后重生
+                    }
                 } else {
                     console.log(`目标玩家 ${data.targetId} 不存在`);
                 }
@@ -209,6 +282,23 @@ function broadcastGameEvent(event) {
     const message = JSON.stringify({
         type: 'gameEvent',
         event: event,
+        timestamp: Date.now()
+    });
+    
+    players.forEach(player => {
+        if (player.ws.readyState === WebSocket.OPEN) {
+            player.ws.send(message);
+        }
+    });
+}
+
+// 添加新函数：广播攻击事件
+function broadcastAttackEvent(attackerId, targetId, data) {
+    const message = JSON.stringify({
+        type: 'attackEvent',
+        attackerId,
+        targetId,
+        data,
         timestamp: Date.now()
     });
     
