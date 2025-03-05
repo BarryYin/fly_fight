@@ -6,7 +6,6 @@ const { v4: uuidv4 } = require('uuid');
 
 // 创建Express应用和HTTP服务器
 const app = express();
-const server = http.createServer(app);
 // 明确指定 WebSocket 服务器路径为 /ws
 const wss = new WebSocket.Server({ 
     server: server,
@@ -344,13 +343,66 @@ setInterval(() => {
     }
 }, 60000); // 每分钟更新一次统计
 
-// 修改端口设置，使其兼容 Vercel
+// 端口配置：优先使用环境变量中的端口
 const PORT = process.env.PORT || 3000;
 
+// 确保server变量是全局定义的，只创建一次
+let server;
+let isServerRunning = false;
+
+// 启动服务器函数
+function startServer() {
+  // 检查服务器是否已经在运行
+  if (isServerRunning) {
+    console.log('服务器已经在运行中，避免重复监听');
+    return;
+  }
+
+  try {
+    // 假设这里是原来创建和配置express应用的代码
+    // ...existing code...
+
+    // 只在服务器未运行时监听端口
+    server = app.listen(PORT, () => {
+      isServerRunning = true;
+      console.log(`服务器正在监听端口: ${PORT}`);
+    });
+
+    // 添加错误处理
+    server.on('error', (error) => {
+      if (error.code === 'EADDRINUSE') {
+        console.error(`端口 ${PORT} 已被占用，请尝试使用不同的端口`);
+      } else {
+        console.error('服务器错误:', error);
+      }
+      isServerRunning = false;
+    });
+
+    // 添加关闭处理
+    process.on('SIGTERM', gracefulShutdown);
+    process.on('SIGINT', gracefulShutdown);
+  } catch (error) {
+    console.error('启动服务器时出错:', error);
+  }
+}
+
+// 优雅关闭函数
+function gracefulShutdown() {
+  console.log('正在关闭服务器...');
+  if (server && isServerRunning) {
+    server.close(() => {
+      console.log('服务器已安全关闭');
+      isServerRunning = false;
+      process.exit(0);
+    });
+  } else {
+    console.log('没有正在运行的服务器实例');
+    process.exit(0);
+  }
+}
+
 // 启动服务器
-server.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-});
+startServer();
 
 // 确保模块可以被 Vercel 导出
 module.exports = server; // 或者 app/express 实例，取决于你的代码结构
