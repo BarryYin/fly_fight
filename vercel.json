@@ -1,12 +1,15 @@
 {
   "version": 2,
   "builds": [
-    { "src": "server.js", "use": "@vercel/node" },
-    { "src": "*.html", "use": "@vercel/static" },
-    { "src": "**/*.{js,css,png,jpg,gif,svg,mp3}", "use": "@vercel/static" }
+    {
+      "src": "server_multiplayer.js",
+      "use": "@vercel/node"
+    }
   ],
   "routes": [
-    { "src": "/", "dest": "index.html" },
-    { "src": "/(.+)", "dest": "/$1" }
+    {
+      "src": "/(.*)",
+      "dest": "server_multiplayer.js"
+    }
   ]
 }
